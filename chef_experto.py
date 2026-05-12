@@ -32,7 +32,7 @@ class ChefExperto(KnowledgeEngine):
         Deseo(termino=MATCH.t),
         Plato(nombre=MATCH.n, instrucciones=MATCH.i),
         TEST(lambda t, n: t.lower() in n.lower()),
-        salience=10
+        salience=10 # La salience es la prioridad: si ambas reglas pueden disparar a la vez, gana la de número más alto.
     )
     def coincidir_nombre(self, t, n, i):
         """Si el termino aparece en el nombre del plato, sugerirlo."""
