@@ -287,3 +287,33 @@ def main():
     while True:
         print("\n1. Buscar receta (IA Local)")
         print("2. Generar PDF")
+        print("3. Salir")
+        opcion = input("Selecciona una opción: ")
+
+        if opcion == "1":
+            texto_usuario = input("\nDescribe lo que quieres comer: ")
+            sugerencias = buscar_recetas_por_deseo(texto_usuario)
+
+            if sugerencias:
+                print("\n🍽️ Recetas Sugeridas:")
+                for idx, s in enumerate(sugerencias, 1):
+                    print(f"{idx}. {s['plato']} (Calorías: {s['macros']['calorias']} kcal)")
+            else:
+                print("\n❌ No se encontraron recetas que coincidan con tu deseo.")
+
+        elif opcion == "2":
+            if sugerencias:
+                receta_sugerida = sugerencias[0]
+                generar_pdf(receta_sugerida)
+            else:
+                print("\n❌ Debes buscar una receta primero.")
+
+        elif opcion == "3":
+            print("\n👋 ¡Hasta luego! ¡Que tengas un buen dia!")
+            break
+
+        else:
+            print("\n❌ Opción no válida. Intenta de nuevo.")
+
+if __name__ == "__main__":
+    main()
