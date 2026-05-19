@@ -46,7 +46,7 @@ def llm_interpretar_deseo(texto_usuario):
     if not ollama:
         print("Ollama no esta disponible. No se puede interpretar deseos complejos.")
         return {"termino": texto_usuario, "contexto": []}
-    
+
     model_name = "llama3"
 
     prompt = f"""
