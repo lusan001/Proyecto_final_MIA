@@ -1,8 +1,8 @@
 import collections
 if not hasattr(collections, 'Mapping'):
     import collections.abc
-    collections.Mapping = collections.abc.Mapping
-    collections.MutableMapping = collections.abc.MutableMapping
+    collections.Mapping = collections.abc.Mapping # type: ignore
+    collections.MutableMapping = collections.abc.MutableMapping # type: ignore
 
 from experta import Fact, KnowledgeEngine, Rule, TEST, MATCH
 import json
@@ -50,7 +50,7 @@ def llm_interpretar_deseo(texto_usuario):
     model_name = "llama3"
 
     prompt = f"""
-    Eres un asistente de cocina experto. El usuario dice: "{texto_usuario}". 
+    Eres un asistente de cocina experto. El usuario dice: "{texto_usuario}".
     Debes de analizar su deseo y devolver Solo un objeto JSON valido con esta estructura exacta:
 {{
     "termino": "palabra clave principal para buscar (ej: 'pollo', 'sopa', 'postre', 'ensalada')",
