@@ -7,6 +7,7 @@ if not hasattr(collections, 'Mapping'):
 from experta import Fact, KnowledgeEngine, Rule, TEST, MATCH
 import json
 import os
+import ollama
 
 # Importar librerias para el pdf
 try:
@@ -42,8 +43,34 @@ class RecetaSugerida(Fact):
     pass
 
 
+# LLM | Inteligencia Artificial con OLLAMA
+def llm_interpretar_deseo(texto_usuario):
+    """
+    Llama a Ollama local para convertir lenguaje natural en JSON estructurado que contenga el deseo y su contexto.
+    """
+    if not ollama:
+        print("Ollama no esta disponible. No se puede interpretar deseos complejos.")
+        return {"termino": texto_usuario, "contexto": []}
+    
+    model_name = "llama3"
 
+    prompt = f"""
+    Eres un asistente de cocina experto. El usuario dice: "{texto_usuario}". 
+    Debes de analizar su deseo y devolver Solo un objeto JSON valido con esta estructura exacta:
+{{
+    "termino": "palabra clave principal para buscar (ej: 'pollo', 'sopa', 'postre', 'ensalada')",
+    "contexto": ["lista", "de", "etiquetas", "si", "aplica"]
+}}
+    Reglas para el JSON:
+    1. Si el usuario pide algo 'ligero' o 'fresco', el termino debe ser 'ensalada y contexto ['ligero'].
+    2. Si pide 'caliente' o 'caldo', termino debe de ser 'sopa' y contexto ['caliente'].
+    3. Si pide 'dulce' o 'postre', termino debe ser 'postre' y contexto ['dulce'].
+    4. SI menciona un ingrediente directo (ej: 'quiero huevo'), el termino es 'huevo'
+    5. No devuelva texto explicativo, solo el JSON.
 
+    """
+
+# el try es para evitar que si falla la llamada a ollama, el sistema siga funcionando con una interpretacion basica del deseo.
 
 # 2. MOTOR DE INFERENCIA
 class ChefExperto(KnowledgeEngine):
