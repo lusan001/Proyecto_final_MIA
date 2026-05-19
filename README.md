@@ -1,71 +1,167 @@
-# 👨‍🍳 Sistema Experto: Chef Privado
+# 👨‍🍳 Chef Privado — Sistema Experto con IA Local
 
-**Chef Privado** es un sistema experto basado en reglas desarrollado en Python con la librería `experta`. El usuario expresa lo que desea comer (ingrediente o nombre de un plato) y el sistema sugiere recetas que coinciden, mostrando además las instrucciones de preparación.
+Sistema experto basado en reglas que interpreta en lenguaje natural lo que el usuario quiere comer y sugiere recetas con sus instrucciones de preparación e información nutricional. Integra un LLM local mediante Ollama para el procesamiento del lenguaje, con un mecanismo de respaldo que garantiza el funcionamiento aunque el modelo no esté disponible.
 
-## 📌 Características
+---
 
-- Motor de inferencia con dos reglas de producción.
-- Coincidencia por **nombre** (subcadena) y por **ingrediente** (exacta).
-- Interfaz interactiva en consola con menú.
-- Base de conocimiento inicial con 7 recetas y sus ingredientes.
-- Código limpio, comentado y compatible con Python 3.8+ (incluye parche para `collections.Mapping`).
+## 📋 Características
 
-## ⚙️ ¿Cómo funciona?
+- Motor de inferencia con tres reglas de producción (coincidencia por nombre, por ingrediente y semántica).
+- Integración con Ollama para interpretar frases en lenguaje natural ("quiero algo ligero con pollo").
+- Fallback automático por palabras clave cuando el LLM no está disponible o devuelve un término no reconocido.
+- Detección dinámica del modelo Ollama disponible (sin hardcoding).
+- Generación de PDF con ingredientes, instrucciones y macronutrientes por ración.
+- Base de conocimiento con 21 recetas y sus ingredientes asociados.
 
-El sistema sigue la arquitectura clásica de un sistema experto:
+---
 
-### 1. Hechos (Facts)
-- `Plato(nombre, instrucciones)`
-- `Ingrediente(plato, ingrediente)`
-- `Deseo(termino)`
-- `RecetaSugerida(plato, instrucciones)`  *(inferido)*
+## 🗂️ Arquitectura
 
-### 2. Base de conocimiento
-Declaración de hechos iniciales: 7 platos con sus recetas y una lista de ingredientes asociados a cada plato.
+El sistema sigue la estructura clásica de un sistema experto:
 
-### 3. Motor de inferencia (Reglas)
-| Regla | Prioridad | Condición | Acción |
-|-------|-----------|-----------|--------|
-| Coincidencia por nombre | 10 | `termino.lower() in nombre_plato.lower()` | Genera `RecetaSugerida` |
-| Coincidencia por ingrediente | 5  | `termino == ingrediente` (exacto) | Genera `RecetaSugerida` |
+```
+Entrada usuario (lenguaje natural)
+        │
+        ▼
+┌───────────────────────┐
+│  LLM (Ollama)         │  extrae término clave
+│  + Fallback local     │  "quiero pollo" → "pollo"
+└───────────┬───────────┘
+            │
+            ▼
+┌───────────────────────┐
+│  Motor de inferencia  │  ChefExperto (experta)
+│  Reglas + salience    │  dispara reglas sobre hechos
+└───────────┬───────────┘
+            │
+            ▼
+┌───────────────────────┐
+│  Base de conocimiento │  Plato · Ingrediente · Deseo
+│  (hechos estáticos)   │  RecetaSugerida (inferido)
+└───────────┬───────────┘
+            │
+            ▼
+   Recetas sugeridas + PDF
+```
 
-### 4. Interfaz de usuario
-Menú interactivo en terminal:
+### Hechos (Facts)
 
-1. Buscar receta por lo que deseo comer  
-2. Ver todas las recetas disponibles  
-3. Salir  
+| Hecho | Campos | Descripción |
+|---|---|---|
+| `Plato` | `nombre`, `instrucciones`, `macros` | Receta completa con macronutrientes |
+| `Ingrediente` | `plato`, `ingrediente` | Relación plato → ingrediente |
+| `Deseo` | `termino`, `contexto` | Intención del usuario (inferida por el LLM) |
+| `RecetaSugerida` | `plato`, `instrucciones`, `macros` | Resultado generado por el motor |
 
-## 🧪 Ejemplos de uso
-### Ejemplo 1: Búsqueda por nombre parcial
+### Reglas
 
-¿Qué te apetece comer? (ej: 'pollo', 'chocolate', 'sopa'): pollo
+| Regla | Salience | Condición |
+|---|---|---|
+| `coincidir_nombre` | 10 | `termino` es subcadena del nombre del plato |
+| `coincidencia_semantica` | 8 | Coincidencia por contexto ("ligero" → ensaladas, "caliente" → sopas) |
+| `coincidir_ingrediente` | 5 | `termino` coincide exactamente con un ingrediente |
 
-✅ Encontradas 2 receta(s) para 'pollo':
-1. Pollo al horno con especias
-2. Ensalada César
+---
 
-¿Quieres ver la preparación de alguna? (número o 'no'): 1
+## ⚙️ Instalación
 
-🍽️  POLLO AL HORNO CON ESPECIAS
-📖 Preparación:
-   - 1. Adobar el pollo con sal, pimienta, romero y ajo.
-   - 2. Hornear a 180°C por 45 min.
-   - 3. Servir con papas.
-El término "pollo" aparece en el nombre del primer plato y también es ingrediente de la Ensalada César.
+**Requisitos:** Python 3.8+, Ollama instalado y corriendo.
 
-### Ejemplo 2: Búsqueda por ingrediente exacto
+```bash
+# Clonar el repositorio
+git clone <url-del-repo>
+cd chef-privado
 
-¿Qué te apetece comer?: chocolate
+# Instalar dependencias Python
+pip install experta fpdf ollama
 
-✅ Encontradas 1 receta(s) para 'chocolate':
-1. Pastel de chocolate
+# Arrancar Ollama con un modelo (si no lo tienes ya)
+ollama pull llama3.2
+ollama serve
+```
 
-### Ejemplo 3: Búsqueda sin coincidencias
+---
 
-¿Qué te apetece comer?: pizza
+## 🚀 Uso
 
-😕 No tengo ninguna receta con 'pizza'. Prueba con otro ingrediente o nombre.
+```bash
+python chef_experto.py
+```
 
-### Ejemplo 4: Ver todas las recetas
-Opción 2 del menú → lista numerada de los 7 platos. Luego se puede elegir uno para ver su preparación.
+```
+========================================
+👨‍🍳 CHEF PRIVADO (CON OLLAMA LOCAL)
+========================================
+
+1. Buscar receta (IA Local)
+2. Generar PDF de la última búsqueda
+3. Salir
+```
+
+### Opción 1 — Buscar receta
+
+El sistema acepta frases en lenguaje natural:
+
+```
+Describe lo que quieres comer: quiero pollo
+
+🤖 Consultando a Ollama (LLM local)...
+   ✅ LLM: termino='pollo', contexto=[]
+
+🍽️ Recetas Sugeridas:
+1. Pollo al horno con especias  (Calorías: 450 kcal)
+2. Ensalada Cesar               (Calorías: 320 kcal)
+3. Pollo al ajillo              (Calorías: 400 kcal)
+4. Tacos de pollo               (Calorías: 500 kcal)
+```
+
+Ejemplos de frases reconocidas:
+
+- `"quiero pollo"` → platos con pollo
+- `"algo ligero y fresco"` → ensaladas
+- `"sopa caliente"` → sopas
+- `"algo dulce"` → postres con chocolate
+- `"tengo huevos en la nevera"` → revueltos
+
+### Opción 2 — Generar PDF
+
+Tras hacer una búsqueda, genera un PDF con la receta elegida que incluye lista de ingredientes, instrucciones paso a paso y tabla de macronutrientes. El archivo se guarda en el directorio actual como `receta_<nombre_plato>.pdf`.
+
+---
+
+## 🔄 Mecanismo de fallback
+
+Si Ollama no está disponible o devuelve un término que no produce resultados, el sistema aplica dos niveles de respaldo sin interrumpir la ejecución:
+
+1. **Fallback semántico local:** detecta palabras clave como "ligero", "sopa", "chocolate" directamente en el texto del usuario.
+2. **Fallback por palabras:** si aun así no hay resultados, prueba cada palabra individual del texto (filtrando artículos y preposiciones cortas) hasta encontrar coincidencias en la base de conocimiento.
+
+---
+
+## 📦 Estructura del proyecto
+
+```
+chef-privado/
+├── chef_experto.py   # Código principal (hechos, reglas, motor, PDF)
+└── README.md
+```
+
+---
+
+## 🛠️ Dependencias
+
+| Librería | Versión mínima | Uso |
+|---|---|---|
+| `experta` | 1.9.4 | Motor de inferencia (sistema experto) |
+| `fpdf` | 1.7.2 | Generación de PDF |
+| `ollama` | 0.1.0 | Cliente para LLM local |
+
+---
+
+## 📝 Notas técnicas
+
+**Compatibilidad Python 3.10+:** el archivo incluye un parche para `collections.Mapping` que fue eliminado en Python 3.10 pero que `experta` aún referencia internamente.
+
+**Encoding PDF:** `fpdf` (versión clásica) no soporta UTF-8 con fuentes estándar. El código codifica los textos a `latin-1` con reemplazo de caracteres para evitar errores con tildes y la ñ. Si se migra a `fpdf2`, este paso puede eliminarse.
+
+**Modelo Ollama:** el sistema detecta automáticamente el primer modelo disponible mediante `ollama.list()`, por lo que no es necesario configurar ningún nombre de modelo manualmente.
