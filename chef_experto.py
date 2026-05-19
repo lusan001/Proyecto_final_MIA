@@ -246,3 +246,44 @@ def generar_pdf(receta_sugerida):
     nombre_archivo = f"receta_{receta_sugerida['plato'].lower().replace(' ', '_')}.pdf"
     pdf.output(nombre_archivo)
     print(f"\n✅ ¡PDF Generado! Guardado como: {nombre_archivo}")
+
+# 5. INTERFAZ DE USUARIO | MAIN
+def buscar_recetas_por_deseo(texto_usuario):
+    engine = ChefExperto()
+    engine.reset()
+    cargar_conocimiento(engine)
+
+    print("🤖 Consultando a Ollama (LLM local)...")
+    # Aquí ocurre la magia real
+    deseo_fact = llm_interpretar_deseo(texto_usuario)
+    engine.declare(deseo_fact)
+
+    engine.run()
+
+    sugerencias = []
+    for f in engine.facts.values():
+        if isinstance(f, RecetaSugerida):
+            sugerencias.append({
+                'plato': f['plato'],
+                'instrucciones': f['instrucciones'],
+                'macros': f['macros']
+            })
+    return sugerencias
+
+def main():
+    print("\n" + "=" * 55)
+    print("👨‍🍳 CHEF PRIVADO (CON OLLAMA LOCAL)")
+    print("=" * 55)
+    print("Prueba: 'quiero algo ligero', 'tengo ganas de pollo', 'quiero sopa caliente'")
+
+    # Verificar si Ollama está corriendo
+    if ollama:
+        try:
+            ollama.list()
+            print("✅ Ollama detectado y listo.")
+        except:
+            print("⚠️  Advertencia: No se pudo conectar con Ollama. Asegúrate de que esté corriendo (ollama serve).")
+
+    while True:
+        print("\n1. Buscar receta (IA Local)")
+        print("2. Generar PDF")
