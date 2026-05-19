@@ -5,24 +5,44 @@ if not hasattr(collections, 'Mapping'):
     collections.MutableMapping = collections.abc.MutableMapping
 
 from experta import Fact, KnowledgeEngine, Rule, TEST, MATCH
+import json
+import os
 
+# Importar librerias para el pdf
+try:
+    from pdf import FPDF # type: ignore
+except ImportError:
+    FPDF = None  # No se puede generar el pdf
 
 # 1. DEFINICION DE HECHOS
 class Plato(Fact):
     """Nombre del plato y sus instrucciones de preparacion."""
+    nombre: str
+    instrucciones: str
+    macros: dict # {'calorias': int, 'proteinas': int, 'carbohidratos': int, 'grasas': int}
     pass
 
 class Ingrediente(Fact):
     """Relacion plato -> ingrediente necesario."""
+    plato: str
+    ingrediente: str
     pass
 
 class Deseo(Fact):
     """Lo que el usuario expresa que quiere comer (termino de busqueda)."""
+    termino: str
+    contexto: list  #Etiquetas asociadas al deseo [ligero, rapido, vegetariano, etc.]
     pass
 
 class RecetaSugerida(Fact):
     """Resultado de la inferencia: plato que satisface el deseo."""
+    plato: str
+    instrucciones: str
+    macros: dict # {'calorias': int, 'proteinas': int, 'carbohidratos': int, 'grasas': int}
     pass
+
+
+
 
 
 # 2. MOTOR DE INFERENCIA
