@@ -8,12 +8,7 @@ from experta import Fact, KnowledgeEngine, Rule, TEST, MATCH
 import json
 import os
 import ollama
-
-# Importar librerias para el pdf
-try:
-    from pdf import FPDF # type: ignore
-except ImportError:
-    FPDF = None  # No se puede generar el pdf
+from fpdf import FPDF
 
 # 1. DEFINICION DE HECHOS
 class Plato(Fact):
@@ -72,8 +67,7 @@ def llm_interpretar_deseo(texto_usuario):
 
 # el try es para evitar que si falla la llamada a ollama, el sistema siga funcionando con una interpretacion basica del deseo.
 
-python
-# filepath: c:\Users\Usuario\Documents\IA_BigDATA\MIA\TrabajoFinal_SistemasExpertos\chef_experto.py
+
 def obtener_macros_ollama(nombre_plato):
     """
     Llama a Ollama para obtener macros reales si no están en la base de conocimiento.
@@ -107,7 +101,7 @@ def obtener_macros_ollama(nombre_plato):
 
 # 2. MOTOR DE INFERENCIA
 class ChefExperto(KnowledgeEngine):
-    @Rule(
+    @Rule(  # Coincidencia por nombre del plato (si el deseo es parte del nombre)
         Deseo(termino=MATCH.t),
         Plato(nombre=MATCH.n, instrucciones=MATCH.i, macros=MATCH.m),
         TEST(lambda t, n: t.lower() in n.lower()),
@@ -116,7 +110,7 @@ class ChefExperto(KnowledgeEngine):
     def coincidir_nombre(self, t, n, i, m):
         self.declare(RecetaSugerida(plato=n, instrucciones=i, macros=m))
 
-    @Rule(
+    @Rule(  # Coincidencia por ingrediente (si el deseo es parte del ingrediente)
         Deseo(termino=MATCH.t),
         Ingrediente(plato=MATCH.p, ingrediente=MATCH.ing),
         Plato(nombre=MATCH.p, instrucciones=MATCH.i, macros=MATCH.m),
@@ -126,7 +120,7 @@ class ChefExperto(KnowledgeEngine):
     def coincidir_ingrediente(self, t, p, i, m):
         self.declare(RecetaSugerida(plato=p, instrucciones=i, macros=m))
 
-    @Rule(
+    @Rule(  # Coincidencia semantica avanzada usando contexto y nombre del plato
         Deseo(contexto=MATCH.ctx),
         Plato(nombre=MATCH.n, instrucciones=MATCH.i, macros=MATCH.m),
         TEST(lambda ctx, n: ("ligero" in ctx and "ensalada" in n.lower()) or
@@ -134,130 +128,121 @@ class ChefExperto(KnowledgeEngine):
                             ("dulce" in ctx and "chocolate" in n.lower())),
         salience=8
     )
-    def coincidencia_semantica(self, ctx, n, i, m):
+    def coincidencia_semantica(self, ctx, n, i, m):  # coincidencia semantica avanzada usando contexto y nombre del plato
         self.declare(RecetaSugerida(plato=n, instrucciones=i, macros=m))
 
 # 3. BASE DE CONOCIMIENTO (RECETAS)
 def cargar_conocimiento(engine):
-    """Declara todos los hechos estaticos: platos e ingredientes."""
-    engine.declare(
-        Plato(nombre="Pollo al horno con especias",
-              instrucciones="1. Adobar el pollo con sal, pimienta, romero y ajo. 2. Hornear a 180°C por 45 min. 3. Servir con papas."),
-        Plato(nombre="Ensalada Cesar",
-              instrucciones="1. Lavar la lechuga. 2. Agregar pollo desmenuzado. 3. Anadir aderezo Cesar y crutones."),
-        Plato(nombre="Sopa de tomate",
-              instrucciones="1. Sofreir cebolla y ajo. 2. Agregar tomates pelados y caldo. 3. Cocinar 20 min y licuar."),
-        Plato(nombre="Tacos de carnitas",
-              instrucciones="1. Dorar la carne de cerdo en su grasa. 2. Calentar tortillas. 3. Servir con cebolla, cilantro y salsa."),
-        Plato(nombre="Pastel de chocolate",
-              instrucciones="1. Batir huevos con azucar. 2. Agregar harina, cacao y levadura. 3. Hornear 30 min a 180°C."),
-        Plato(nombre="Revuelto de champinones",
-              instrucciones="1. Saltear champinones laminados con ajo. 2. Incorporar huevo batido. 3. Cocinar hasta cuajar."),
-        Plato(nombre="Ceviche de pescado",
-              instrucciones="1. Cortar pescado en cubos. 2. Marinar con jugo de limon, cebolla morada, cilantro y aji. 3. Reposar 20 min."),
+    recetas = [
+        ("Pollo al horno con especias", "1. Adobar el pollo con sal, pimienta, romero y ajo. 2. Hornear a 180°C por 45 min. 3. Servir con papas.", {"calorias": 450, "proteinas": 35, "carbos": 15, "grasas": 20}),
+        ("Ensalada Cesar", "1. Lavar la lechuga. 2. Agregar pollo desmenuzado. 3. Añadir aderezo Cesar y crutones.", {"calorias": 320, "proteinas": 18, "carbos": 10, "grasas": 22}),
+        ("Sopa de tomate", "1. Sofreir cebolla y ajo. 2. Agregar tomates pelados y caldo. 3. Cocinar 20 min y licuar.", {"calorias": 150, "proteinas": 5, "carbos": 25, "grasas": 4}),
+        ("Tacos de carnitas", "1. Dorar la carne de cerdo en su grasa. 2. Calentar tortillas. 3. Servir con cebolla, cilantro y salsa.", {"calorias": 600, "proteinas": 30, "carbos": 45, "grasas": 30}),
+        ("Pastel de chocolate", "1. Batir huevos con azucar. 2. Agregar harina, cacao y levadura. 3. Hornear 30 min a 180°C.", {"calorias": 400, "proteinas": 6, "carbos": 60, "grasas": 12}),
+        ("Revuelto de champinones", "1. Saltear champinones laminados con ajo. 2. Incorporar huevo batido. 3. Cocinar hasta cuajar.", {"calorias": 220, "proteinas": 14, "carbos": 4, "grasas": 16}),
+        ("Ceviche de pescado", "1. Cortar pescado en cubos. 2. Marinar con jugo de limon, cebolla morada, cilantro y aji. 3. Reposar 20 min.", {"calorias": 280, "proteinas": 28, "carbos": 10, "grasas": 8}),
+        ("Ensalada de frutas", "1. Cortar frutas. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 150, "proteinas": 3, "carbos": 25, "grasas": 4}),
+        ("Ensalada de verduras", "1. Cortar verduras. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 100, "proteinas": 2, "carbos": 15, "grasas": 0}),
+        ("Ensalada de aguacate", "1. Cortar aguacate. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 80, "proteinas": 2, "carbos": 10, "grasas": 0}),
+        ("Ensalada de lechuga y tomate", "1. Cortar lechuga y tomate. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 50, "proteinas": 1, "carbos": 5, "grasas": 0}),
+        ("Ensalada de zanahorias", "1. Cortar zanahorias. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 40, "proteinas": 1, "carbos": 5, "grasas": 0}),
+        ("Natillas caseras", "1. Calentar leche con azucar y vainilla. 2. Batir huevos y agregar a la leche. 3. Cocinar a fuego bajo hasta espesar.", {"calorias": 250, "proteinas": 6, "carbos": 30, "grasas": 8}),
+        ("Pastel de manzana", "1. Preparar masa con harina, mantequilla y azucar. 2. Rellenar con manzanas cortadas y canela. 3. Hornear 40 min a 180°C.", {"calorias": 350, "proteinas": 4, "carbos": 50, "grasas": 10}),
+        ("Brownie de chocolate", "1. Derretir chocolate con mantequilla. 2. Batir huevos con azucar. 3. Agregar harina y mezclar. 4. Hornear 25 min a 180°C.", {"calorias": 450, "proteinas": 5, "carbos": 60, "grasas": 20}),
+        ("Patata asada con romero", "1. Lavar patatas y pintar. 2. Hornear a 180°C por 20 min. 3. Servir con salsa de romero.", {"calorias": 200, "proteinas": 6, "carbos": 20, "grasas": 10}),
+        ("Sopa de verduras", "1. Sofreir cebolla y ajo. 2. Agregar verduras picadas y caldo. 3. Cocinar 30 min y servir.", {"calorias": 120, "proteinas": 4, "carbos": 20, "grasas": 3}),
+        ("Macarrones con queso", "1. Cocer macarrones. 2. Preparar salsa con queso y leche. 3. Mezclar todo y gratinar.", {"calorias": 500, "proteinas": 15, "carbos": 70, "grasas": 20}),
+        ("Pollo al ajillo", "1. Dorar pollo con ajo en aceite de oliva. 2. Agregar vino blanco y cocinar hasta reducir.", {"calorias": 400, "proteinas": 30, "carbos": 10, "grasas": 15}),
+        ("Tacos de pollo", "1. Dorar pollo en su grasa. 2. Calentar tortillas. 3. Servir con cebolla, cilantro y salsa.", {"calorias": 500, "proteinas": 30, "carbos": 45, "grasas": 30}),
+        ("Ensalada de aguacate y tomate", "1. Cortar aguacate y tomate. 2. Incorporar jugo de limon. 3. Servir con yogur natural.", {"calorias": 80, "proteinas": 2, "carbos": 10, "grasas": 0}),
+    ]
+    return recetas
 
-        Ingrediente(plato="Pollo al horno con especias", ingrediente="pollo"),
-        Ingrediente(plato="Pollo al horno con especias", ingrediente="romero"),
-        Ingrediente(plato="Ensalada Cesar", ingrediente="lechuga"),
-        Ingrediente(plato="Ensalada Cesar", ingrediente="pollo"),
-        Ingrediente(plato="Ensalada Cesar", ingrediente="aderezo cesar"),
-        Ingrediente(plato="Sopa de tomate", ingrediente="tomate"),
-        Ingrediente(plato="Sopa de tomate", ingrediente="cebolla"),
-        Ingrediente(plato="Tacos de carnitas", ingrediente="cerdo"),
-        Ingrediente(plato="Tacos de carnitas", ingrediente="tortilla"),
-        Ingrediente(plato="Tacos de carnitas", ingrediente="cilantro"),
-        Ingrediente(plato="Pastel de chocolate", ingrediente="chocolate"),
-        Ingrediente(plato="Pastel de chocolate", ingrediente="harina"),
-        Ingrediente(plato="Revuelto de champinones", ingrediente="champinones"),
-        Ingrediente(plato="Revuelto de champinones", ingrediente="huevo"),
-        Ingrediente(plato="Ceviche de pescado", ingrediente="pescado"),
-        Ingrediente(plato="Ceviche de pescado", ingrediente="limon"),
-    )
+def obtener_ingredientes(nombre_plato):
+    """Devuelve la lista de ingredientes para un plato dado.
+    Si no se encuentra el plato, devuelve lista vacía.
+    """
+    mapping = {
+        "Pollo al horno con especias": ["pollo", "romero", "sal", "pimienta", "ajo", "papas"],
+        "Ensalada Cesar": ["lechuga", "pollo", "aderezo cesar", "crutones"],
+        "Sopa de tomate": ["tomate", "cebolla", "ajo", "caldo"],
+        "Tacos de carnitas": ["cerdo", "tortilla", "cilantro", "cebolla"],
+        "Pastel de chocolate": ["huevo", "azucar", "harina", "cacao"],
+        "Revuelto de champinones": ["champinones", "huevo", "ajo"],
+        "Ceviche de pescado": ["pescado", "limon", "cebolla morada", "cilantro", "aji"],
+        "Ensalada de frutas": ["frutas mixtas", "limon", "yogur"],
+        "Ensalada de verduras": ["verduras mixtas", "limon", "yogur"],
+        "Ensalada de aguacate": ["aguacate", "limon", "yogur"],
+        "Ensalada de lechuga y tomate": ["lechuga", "tomate", "limon"],
+        "Ensalada de zanahorias": ["zanahorias", "limon", "yogur"],
+        "Natillas caseras": ["leche", "azucar", "huevo", "vainilla"],
+        "Pastel de manzana": ["harina", "mantequilla", "azucar", "manzana", "canela"],
+        "Brownie de chocolate": ["chocolate", "mantequilla", "huevo", "harina"],
+        "Patata asada con romero": ["patatas", "romero", "aceite"],
+        "Sopa de verduras": ["verduras mixtas", "caldo", "cebolla", "ajo"],
+        "Macarrones con queso": ["macarrones", "queso", "leche"],
+        "Pollo al ajillo": ["pollo", "ajo", "vino blanco", "aceite"],
+        "Tacos de pollo": ["pollo", "tortilla", "cilantro", "cebolla"],
+        "Ensalada de aguacate y tomate": ["aguacate", "tomate", "limon"],
+    }
+
+    return mapping.get(nombre_plato, [])
 
 
-# 4. FUNCIONES DE BUSQUEDA E INTERFAZ
-def buscar_recetas_por_deseo(termino):
-    engine = ChefExperto()
-    engine.reset()
-    cargar_conocimiento(engine)
-    engine.declare(Deseo(termino=termino))
-    engine.run()
-    sugerencias = [(f['plato'], f['instrucciones']) 
-                   for f in engine.facts.values() 
-                   if isinstance(f, RecetaSugerida)]
-    return sugerencias
+# 4. Generacion de PDF
 
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 15)
+        self.cell(0, 10, 'Chef Privado - Tu Receta', 0, 1, 'C')
+        self.ln(5)
 
-def mostrar_receta(plato, instrucciones):
-    """Imprime una receta formateada."""
-    print(f"\n>>> {plato.upper()} <<<")
-    print("Preparacion:")
-    for paso in instrucciones.split(". "):
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+
+def generar_pdf(receta_sugerida):
+    if FPDF is None:
+        print("\n❌ ERROR: No se puede generar el PDF. Instala 'fpdf' con: pip install fpdf")
+        return
+
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.set_font('Arial', '', 12)
+
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 12, receta_sugerida['plato'], 0, 1)
+    pdf.ln(2)
+
+    pdf.set_fill_color(230, 230, 230)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 8, 'Información Nutricional:', 0, 1, 'L', True)
+    pdf.set_font('Arial', '', 11)
+
+    macros = receta_sugerida['macros']
+    linea = f"Calorías: {macros['calorias']} kcal | Proteínas: {macros['proteinas']}g | Carbs: {macros['carbos']}g | Grasas: {macros['grasas']}g"
+    pdf.cell(0, 8, linea, 0, 1)
+    pdf.ln(2)
+
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 8, 'Ingredientes:', 0, 1, 'L', True)
+    pdf.set_font('Arial', '', 11)
+
+    ingredientes = obtener_ingredientes(receta_sugerida['plato'])
+    for ing in ingredientes:
+        pdf.cell(0, 6, f"• {ing}", 0, 1)
+    pdf.ln(5)
+
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 8, 'Instrucciones:', 0, 1, 'L', True)
+    pdf.set_font('Arial', '', 11)
+
+    pasos = receta_sugerida['instrucciones'].split('. ')
+    for paso in pasos:
         if paso.strip():
-            print(f"   - {paso.strip()}")
-    print()
+            pdf.multi_cell(0, 6, f"   {paso.strip()}.")
 
-
-def main():
-    print("\n" + "=" * 55)
-    print("SISTEMA EXPERTO: CHEF PRIVADO")
-    print("=" * 55)
-    print("Dime que quieres comer (ingrediente o nombre del plato)")
-    print("y te sugerire una receta.")
-    print("-" * 55)
-
-    while True:
-        print("\nMENU PRINCIPAL")
-        print("1. Buscar receta por lo que deseo comer")
-        print("2. Ver todas las recetas disponibles")
-        print("3. Salir")
-
-        opcion = input("\nSelecciona una opcion: ").strip()
-
-        if opcion == "1":
-            deseo = input("\n¿Que te apetece comer? (ej: 'pollo', 'chocolate', 'sopa'): ").strip().lower()
-            if not deseo:
-                print("No has escrito nada.")
-                continue
-
-            sugerencias = buscar_recetas_por_deseo(deseo)
-
-            if sugerencias:
-                print(f"\nEncontradas {len(sugerencias)} receta(s) para '{deseo}':")
-                for i, (nombre, _) in enumerate(sugerencias, 1):
-                    print(f"{i}. {nombre}")
-                ver = input("\n¿Quieres ver la preparacion de alguna? (numero o 'no'): ").strip()
-                if ver.isdigit() and 1 <= int(ver) <= len(sugerencias):
-                    idx = int(ver) - 1
-                    mostrar_receta(sugerencias[idx][0], sugerencias[idx][1])
-                elif ver.lower() != 'no':
-                    print("Opcion no valida.")
-            else:
-                print(f"\nNo tengo ninguna receta con '{deseo}'. Prueba con otro ingrediente o nombre.")
-
-        elif opcion == "2":
-            temp_engine = ChefExperto()
-            temp_engine.reset()
-            cargar_conocimiento(temp_engine)
-            platos = [f for f in temp_engine.facts.values() if isinstance(f, Plato)]
-            if not platos:
-                print("No hay recetas cargadas.")
-            else:
-                print("\nRECETARIO COMPLETO:")
-                for i, plato in enumerate(platos, 1):
-                    print(f"{i}. {plato['nombre']}")
-            ver = input("\n¿Ver detalles de alguna receta? (numero o 'no'): ").strip()
-            if ver.isdigit() and 1 <= int(ver) <= len(platos):
-                idx = int(ver) - 1
-                plato = platos[idx]
-                mostrar_receta(plato['nombre'], plato['instrucciones'])
-
-        elif opcion == "3":
-            print("\nBuen provecho. Hasta pronto.")
-            break
-        else:
-            print("Opcion invalida. Elige 1, 2 o 3.")
-
-
-if __name__ == "__main__":
-    main()
+    nombre_archivo = f"receta_{receta_sugerida['plato'].lower().replace(' ', '_')}.pdf"
+    pdf.output(nombre_archivo)
+    print(f"\n✅ ¡PDF Generado! Guardado como: {nombre_archivo}")
