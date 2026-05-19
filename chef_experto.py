@@ -72,30 +72,70 @@ def llm_interpretar_deseo(texto_usuario):
 
 # el try es para evitar que si falla la llamada a ollama, el sistema siga funcionando con una interpretacion basica del deseo.
 
+python
+# filepath: c:\Users\Usuario\Documents\IA_BigDATA\MIA\TrabajoFinal_SistemasExpertos\chef_experto.py
+def obtener_macros_ollama(nombre_plato):
+    """
+    Llama a Ollama para obtener macros reales si no están en la base de conocimiento.
+    """
+    base_datos = {
+        "Pollo al horno con especias": {"calorias": 450, "proteinas": 35, "carbos": 15, "grasas": 20},
+        "Ensalada Cesar": {"calorias": 320, "proteinas": 18, "carbos": 10, "grasas": 22},
+        "Sopa de tomate": {"calorias": 150, "proteinas": 5, "carbos": 25, "grasas": 4},
+        "Tacos de carnitas": {"calorias": 600, "proteinas": 30, "carbos": 45, "grasas": 30},
+        "Pastel de chocolate": {"calorias": 400, "proteinas": 6, "carbos": 60, "grasas": 12},
+        "Revuelto de champinones": {"calorias": 220, "proteinas": 14, "carbos": 4, "grasas": 16},
+        "Ceviche de pescado": {"calorias": 280, "proteinas": 28, "carbos": 10, "grasas": 8},
+        "Ensalada de frutas": {"calorias": 100, "proteinas": 2, "carbos": 15, "grasas": 0},
+        "Ensalada de coliflor": {"calorias": 80, "proteinas": 2, "carbos": 10, "grasas": 0},
+        "Ensalada de lechuga": {"calorias": 50, "proteinas": 1, "carbos": 5, "grasas": 0},
+        "Pastel de manzana": {"calorias": 350, "proteinas": 4, "carbos": 50, "grasas": 10},
+        "Ensalada de tomate": {"calorias": 100, "proteinas": 2, "carbos": 15, "grasas": 0},
+        "Ensalada de aguacate": {"calorias": 80, "proteinas": 2, "carbos": 10, "grasas": 0},
+        "Ensalada de lechuga y tomate": {"calorias": 50, "proteinas": 1, "carbos": 5, "grasas": 0},
+        "Brownie de chocolate": {"calorias": 450, "proteinas": 5, "carbos": 60, "grasas": 20},
+        "Patata asada con romero": {"calorias": 200, "proteinas": 3, "carbos": 30, "grasas": 5},
+        "Sopa de verduras": {"calorias": 120, "proteinas": 4, "carbos": 20, "grasas": 3},
+        "Macarrones con queso": {"calorias": 500, "proteinas": 15, "carbos": 70, "grasas": 20},
+        "Pollo al ajillo": {"calorias": 400, "proteinas": 30, "carbos": 10, "grasas": 15},
+        "Natillas caseras": {"calorias": 250, "proteinas": 6, "carbos": 30, "grasas": 8},
+    }
+
+    return base_datos.get(nombre_plato, {"calorias": 0, "proteinas": 0, "carbos": 0, "grasas": 0})
+
+
+
 # 2. MOTOR DE INFERENCIA
 class ChefExperto(KnowledgeEngine):
-
     @Rule(
         Deseo(termino=MATCH.t),
-        Plato(nombre=MATCH.n, instrucciones=MATCH.i),
+        Plato(nombre=MATCH.n, instrucciones=MATCH.i, macros=MATCH.m),
         TEST(lambda t, n: t.lower() in n.lower()),
-        salience=10 # La salience es la prioridad: si ambas reglas pueden disparar a la vez, gana la de número más alto.
+        salience=10
     )
-    def coincidir_nombre(self, t, n, i):
-        """Si el termino aparece en el nombre del plato, sugerirlo."""
-        self.declare(RecetaSugerida(plato=n, instrucciones=i))
+    def coincidir_nombre(self, t, n, i, m):
+        self.declare(RecetaSugerida(plato=n, instrucciones=i, macros=m))
 
     @Rule(
         Deseo(termino=MATCH.t),
         Ingrediente(plato=MATCH.p, ingrediente=MATCH.ing),
-        Plato(nombre=MATCH.p, instrucciones=MATCH.i),
+        Plato(nombre=MATCH.p, instrucciones=MATCH.i, macros=MATCH.m),
         TEST(lambda t, ing: t.lower() == ing.lower()),
         salience=5
     )
-    def coincidir_ingrediente(self, t, p, i):
-        """Si el termino es exactamente un ingrediente, sugerir el plato."""
-        self.declare(RecetaSugerida(plato=p, instrucciones=i))
+    def coincidir_ingrediente(self, t, p, i, m):
+        self.declare(RecetaSugerida(plato=p, instrucciones=i, macros=m))
 
+    @Rule(
+        Deseo(contexto=MATCH.ctx),
+        Plato(nombre=MATCH.n, instrucciones=MATCH.i, macros=MATCH.m),
+        TEST(lambda ctx, n: ("ligero" in ctx and "ensalada" in n.lower()) or
+                            ("caliente" in ctx and "sopa" in n.lower()) or
+                            ("dulce" in ctx and "chocolate" in n.lower())),
+        salience=8
+    )
+    def coincidencia_semantica(self, ctx, n, i, m):
+        self.declare(RecetaSugerida(plato=n, instrucciones=i, macros=m))
 
 # 3. BASE DE CONOCIMIENTO (RECETAS)
 def cargar_conocimiento(engine):
